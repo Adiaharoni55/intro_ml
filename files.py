@@ -42,5 +42,31 @@ def remove_sparse_columns(df: pd.DataFrame, threshold: int) -> pd.DataFrame:
     return res
 
 
-def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
+def PCA_calculation(df: pd.DataFrame):
+    """
+    calculate pca of all the columns
+    :param df: A pandas DataFrame.
+    :return: column name to remove
+    """
     pass
+
+
+def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
+    """
+    :param df: A pandas DataFrame containing the data to be reduced.
+    :param num_components: The number of principal components to retain.
+    :param meta_columns: A list of metadata columns to exclude from dimensionality reduction (these should be included in the final output without changes).
+    :return: A pandas DataFrame with the reduced dimensions and the metadata columns.
+    """
+    res = df
+    for column_name in meta_columns:
+        df = df.drop(columns=column_name)
+    while len(res.columns) > num_components:
+        min_sum_column = df.sum().idxmin() # PCA calculation instead of min
+        df = df.drop(columns=min_sum_column)
+        res = res.drop(columns=min_sum_column)
+    return res
+
+
+# df_data = load_data("knesset_25.xlsx").head(5)
+# print(dimensionality_reduction(df_data, 10, ['city_name', 'ballot_code']))
