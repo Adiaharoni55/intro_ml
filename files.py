@@ -52,29 +52,42 @@ def PCA_calculation(df: pd.DataFrame):
 
 
 def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
-    df_log1p = df.fillna(0).copy()
-
-
-    for col in meta_columns:
-        df_log1p[col] = np.log1p(df_log1p[col]) 
-
-    to_transform = df_log1p[meta_columns]
-
+    # Separate features (non-meta columns) and meta columns
+    non_meta_columns = [col for col in df.columns if col not in meta_columns]
+    
+    # Get the data to transform (non-meta columns)
+    to_transform = df[non_meta_columns].copy()
+    to_transform = to_transform.fillna(0)
+    
+    # Standardize the data (both center and scale)
     m = to_transform.mean(axis=0)
-
-    # Center the data
-    to_transform = to_transform - m 
-
+    s = to_transform.std(axis=0)
+    to_transform = (to_transform - m) / s
+    
     # Calculate covariance matrix
     cov_matrix = np.cov(to_transform.T)
-
+    
     # Get eigenvalues and eigenvectors
     eigvalues, eigvectors = np.linalg.eigh(cov_matrix)
-
+    
     # Select top k components
     top_k_indices = (-eigvalues).argsort()[:num_components]
     top_k_eigenvectors = -eigvectors[:, top_k_indices]
+    top_k_eigenvectors[:, 1] = -top_k_eigenvectors[:, -1]  # Flip second component
 
     # Transform the data using scaled eigenvectors
-    return np.dot(to_transform, top_k_eigenvectors)
-
+    reduced_data = np.dot(to_transform, top_k_eigenvectors)
+    
+    # Convert reduced data to DataFrame
+    reduced_df = pd.DataFrame(
+        reduced_data,
+        index=df.index,
+        columns=[f'PC{i+1}' for i in range(num_components)]
+    )
+    
+    if meta_columns:
+        result = pd.concat([reduced_df, df[meta_columns]], axis=1)
+    else:
+        result = reduced_df
+        
+    return result
