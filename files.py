@@ -52,21 +52,29 @@ def PCA_calculation(df: pd.DataFrame):
 
 
 def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
-    """
-    :param df: A pandas DataFrame containing the data to be reduced.
-    :param num_components: The number of principal components to retain.
-    :param meta_columns: A list of metadata columns to exclude from dimensionality reduction (these should be included in the final output without changes).
-    :return: A pandas DataFrame with the reduced dimensions and the metadata columns.
-    """
-    res = df
-    for column_name in meta_columns:
-        df = df.drop(columns=column_name)
-    while len(res.columns) > num_components:
-        min_sum_column = df.sum().idxmin() # PCA calculation instead of min
-        df = df.drop(columns=min_sum_column)
-        res = res.drop(columns=min_sum_column)
-    return res
+    df_log1p = df.fillna(0).copy()
 
 
-# df_data = load_data("knesset_25.xlsx").head(5)
-# print(dimensionality_reduction(df_data, 10, ['city_name', 'ballot_code']))
+    for col in meta_columns:
+        df_log1p[col] = np.log1p(df_log1p[col]) 
+
+    to_transform = df_log1p[meta_columns]
+
+    m = to_transform.mean(axis=0)
+
+    # Center the data
+    to_transform = to_transform - m 
+
+    # Calculate covariance matrix
+    cov_matrix = np.cov(to_transform.T)
+
+    # Get eigenvalues and eigenvectors
+    eigvalues, eigvectors = np.linalg.eigh(cov_matrix)
+
+    # Select top k components
+    top_k_indices = (-eigvalues).argsort()[:num_components]
+    top_k_eigenvectors = -eigvectors[:, top_k_indices]
+
+    # Transform the data using scaled eigenvectors
+    return np.dot(to_transform, top_k_eigenvectors)
+
