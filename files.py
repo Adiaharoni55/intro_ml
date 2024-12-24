@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib as plt
 import streamlit as st
+import plotly.express as px
 
 def load_data(filepath: str) -> pd.DataFrame:
     """
@@ -42,13 +43,34 @@ def remove_sparse_columns(df: pd.DataFrame, threshold: int) -> pd.DataFrame:
     return res
 
 
+# def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
+#     """
+#     :param df: A pandas DataFrame containing the data to be reduced.
+#     :param num_components: The number of principal components to retain.
+#     :param meta_columns: A list of metadata columns to exclude from dimensionality reduction (these should be included in the final output without changes).
+#     :return: A pandas DataFrame with the reduced dimensions and the metadata columns.
+#     """
+#     # Separate features (non-meta columns) and meta columns
+#     non_meta_columns = [col for col in df.columns if col not in meta_columns]
+#
+#     # Get the data to transform (non-meta columns)
+#     to_transform = df[non_meta_columns].copy()
+#     to_transform = to_transform.fillna(0)
+#
+#     # Standardize the data (both center and scale)
+#     m = to_transform.mean(axis=0)
+#     s = to_transform.std(axis=0)
+#     to_transform = (to_transform - m) / s
+#
+#     a_at = to_transform @ to_transform.T
+
 
 def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
     # Separate features (non-meta columns) and meta columns
     non_meta_columns = [col for col in df.columns if col not in meta_columns]
 
     # Get the data to transform (non-meta columns)
-    to_transform = df[non_meta_columns].copy()
+    to_transform = df[non_meta_columns].select_dtypes(include=['number']).copy()
     to_transform = to_transform.fillna(0)
 
     # Standardize the data (both center and scale)
@@ -56,7 +78,6 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
     s = to_transform.std(axis=0)
     to_transform = (to_transform - m) / s
     to_transform = to_transform.to_numpy()
-
 
     # Choose which matrix to decompose based on dimensions
     n, p = to_transform.shape
@@ -68,7 +89,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
 
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
-        # eigvalues = eigvalues[idx]
+        eigvalues = eigvalues[idx]
         # Keep only top num_components
         U = U[:, idx]
 
@@ -77,7 +98,6 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         for i in range(U.shape[1]):
             if np.max(np.abs(U[:, i])) != np.max(U[:, i]):
                 U[:, i] *= -1
-
 
         # Keep only the components we want
         U_reduced = U[:, :num_components]
@@ -93,7 +113,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
 
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
-        # eigvalues = eigvalues[idx]
+        eigvalues = eigvalues[idx]
         V = V[:, idx]
 
         # Fix signs to match sklearn's convention***************
@@ -107,11 +127,10 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         # Project the data
         reduced_data = to_transform @ V_reduced
 
-
     reduced_df = pd.DataFrame(
         reduced_data,
         index=df.index,
-        columns=[f'PC{i+1}' for i in range(num_components)]
+        columns=[f'PC{i + 1}' for i in range(num_components)]
     )
     if meta_columns:
         result = pd.concat([reduced_df, df[meta_columns]], axis=1)
@@ -120,6 +139,10 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
 
     return result
 
+
+
+# num_of_remove_sparse = st.slider('Select a column', min_value=1, max_value=10, value=1)
+# st.write(num_of_remove_sparse, "the number of sparse columns", num_of_remove_sparse)
 
 # Streamlit app
 def main():
