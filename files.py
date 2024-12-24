@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import streamlit as st
 
 def load_data(filepath: str) -> pd.DataFrame:
     """
@@ -67,7 +68,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
 
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
-        eigvalues = eigvalues[idx]
+        # eigvalues = eigvalues[idx]
         # Keep only top num_components
         U = U[:, idx]
 
@@ -92,7 +93,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
 
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
-        eigvalues = eigvalues[idx]
+        # eigvalues = eigvalues[idx]
         V = V[:, idx]
 
         # Fix signs to match sklearn's convention***************
@@ -120,44 +121,63 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
     return result
 
 
-# def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
-#     # Separate features (non-meta columns) and meta columns
-#     non_meta_columns = [col for col in df.columns if col not in meta_columns]
-#
-#     # Get the data to transform (non-meta columns)
-#     to_transform = df[non_meta_columns].copy()
-#     to_transform = to_transform.fillna(0)
-#
-#     # Standardize the data (both center and scale)
-#     m = to_transform.mean(axis=0)
-#
-#
-#     s = to_transform.std(axis=0)
-#     to_transform = (to_transform - m) / s
-#
-#     # Calculate covariance matrix
-#     cov_matrix = np.cov(to_transform.T)
-#     # Get eigenvalues and eigenvectors
-#     eigvalues, eigvectors = np.linalg.eigh(cov_matrix)
-#
-#     # Select top k components
-#     top_k_indices = (-eigvalues).argsort()[:num_components]
-#     top_k_eigenvectors = -eigvectors[:, top_k_indices]
-#     top_k_eigenvectors[:, 1] = -top_k_eigenvectors[:, -1]  # Flip second component
-#
-#     reduced_data = np.dot(to_transform, top_k_eigenvectors)
-#
-#     # Convert reduced data to DataFrame
-#     reduced_df = pd.DataFrame(
-#         reduced_data,
-#         index=df.index,
-#         columns=[f'PC{i + 1}' for i in range(num_components)]
-#     )
-#
-#     if meta_columns:
-#         result = pd.concat([reduced_df, df[meta_columns]], axis=1)
-#     else:
-#         result = reduced_df
-#
-#     return result
+# Streamlit app
+def main():
+    st.title("Dimensionality Reduction with PCA")
+
+    # File upload
+    uploaded_file = st.file_uploader("Upload your file", type=['csv', 'xlsx'])
+    if uploaded_file is None:
+        return
+    data = load_data(uploaded_file.name)
+
+    # show the original data - head 5
+    st.write(f"### Original Data:")
+    st.dataframe(data.head())
+
+    # Sidebar
+    st.sidebar.title("Options")
+    num_components = st.sidebar.slider("Number of Components", 2, 10, value=2)
+
+    choose_column = st.sidebar.selectbox("Select the column representing cities:", data.columns)
+    agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
+
+    sparse_threshold = st.sidebar.slider("Select Threshold", 100, 2000, value=750)
+
+    data_agg = group_and_aggregate_data(data, choose_column, agg_function)
+
+    sparse_agg_data = remove_sparse_columns(data_agg, sparse_threshold)
+
+    # st.write("Loaded Data:", data_agg.head())
+    st.write(f"### Aggregated Data by {choose_column}")
+    st.dataframe(sparse_agg_data.head())
+
+    data_reduce = dimensionality_reduction(sparse_agg_data, num_components, ['ballot_code'])
+    # PCA
+    numeric_data = data_reduce.select_dtypes(include=['number'])
+    if not numeric_data.empty:
+        # reduced_data = dimensionality_reduction(numeric_data, num_components)
+        st.write("### Reduced Dimensional Data")
+        st.dataframe(data_reduce)
+
+        # Visualization
+        st.write("### PCA Visualization")
+        st.bar_chart(data_reduce)
+    else:
+        st.warning("No numeric columns found for PCA.")
+
+    st.write("### PCA Visualization")
+    if num_components == 2:
+        # 2D Visualization using Plotly
+        fig = px.scatter(data_reduce, x="PC1", y="PC2", title="2D PCA Visualization", opacity=0.7)
+        st.plotly_chart(fig)
+    elif num_components == 3:
+        # 3D Visualization
+        fig = px.scatter_3d(data_reduce, x="PC1", y="PC2", z="PC3", title="3D PCA Visualization", opacity=0.7)
+        st.plotly_chart(fig)
+
+
+# Run the app
+if __name__ == "__main__":
+    main()
 
