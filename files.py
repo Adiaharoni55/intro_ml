@@ -45,18 +45,18 @@ def remove_sparse_columns(df: pd.DataFrame, threshold: int) -> pd.DataFrame:
 def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
     # Separate features (non-meta columns) and meta columns
     non_meta_columns = [col for col in df.columns if col not in meta_columns]
-    
+
     # Get the data to transform (non-meta columns)
     to_transform = df[non_meta_columns].copy()
     to_transform = to_transform.fillna(0)
-    
+
     # Standardize the data (both center and scale)
     m = to_transform.mean(axis=0)
     s = to_transform.std(axis=0)
     to_transform = (to_transform - m) / s
-    to_transform = to_transform.to_numpy()  
+    to_transform = to_transform.to_numpy()
 
-    
+
     # Choose which matrix to decompose based on dimensions
     n, p = to_transform.shape
 
@@ -64,7 +64,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         # Compute eigendecomposition of A*A^T (smaller matrix)
         a_at = np.dot(to_transform, to_transform.T)
         eigvalues, U = np.linalg.eigh(a_at)
-        
+
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
         eigvalues = eigvalues[idx]
@@ -80,7 +80,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
 
         # Keep only the components we want
         U_reduced = U[:, :num_components]
-        
+
         # Project the data directly
         reduced_data = U_reduced  # The projection is already in U
 
@@ -89,7 +89,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         # Compute eigendecomposition of A^T*A (smaller matrix)
         at_a = np.dot(to_transform.T, to_transform)
         eigvalues, V = np.linalg.eigh(at_a)
-        
+
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
         eigvalues = eigvalues[idx]
@@ -99,10 +99,10 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         for i in range(V.shape[1]):
             if np.max(np.abs(V[:, i])) != np.max(V[:, i]):
                 V[:, i] *= -1
-        
+
         # Keep only the components we want
         V_reduced = V[:, :num_components]
-        
+
         # Project the data
         reduced_data = to_transform @ V_reduced
 
@@ -116,7 +116,48 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         result = pd.concat([reduced_df, df[meta_columns]], axis=1)
     else:
         result = reduced_df
-        
+
     return result
 
+
+# def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns: list[str]) -> pd.DataFrame:
+#     # Separate features (non-meta columns) and meta columns
+#     non_meta_columns = [col for col in df.columns if col not in meta_columns]
+#
+#     # Get the data to transform (non-meta columns)
+#     to_transform = df[non_meta_columns].copy()
+#     to_transform = to_transform.fillna(0)
+#
+#     # Standardize the data (both center and scale)
+#     m = to_transform.mean(axis=0)
+#
+#
+#     s = to_transform.std(axis=0)
+#     to_transform = (to_transform - m) / s
+#
+#     # Calculate covariance matrix
+#     cov_matrix = np.cov(to_transform.T)
+#     # Get eigenvalues and eigenvectors
+#     eigvalues, eigvectors = np.linalg.eigh(cov_matrix)
+#
+#     # Select top k components
+#     top_k_indices = (-eigvalues).argsort()[:num_components]
+#     top_k_eigenvectors = -eigvectors[:, top_k_indices]
+#     top_k_eigenvectors[:, 1] = -top_k_eigenvectors[:, -1]  # Flip second component
+#
+#     reduced_data = np.dot(to_transform, top_k_eigenvectors)
+#
+#     # Convert reduced data to DataFrame
+#     reduced_df = pd.DataFrame(
+#         reduced_data,
+#         index=df.index,
+#         columns=[f'PC{i + 1}' for i in range(num_components)]
+#     )
+#
+#     if meta_columns:
+#         result = pd.concat([reduced_df, df[meta_columns]], axis=1)
+#     else:
+#         result = reduced_df
+#
+#     return result
 
