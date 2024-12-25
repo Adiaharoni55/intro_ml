@@ -18,13 +18,37 @@ def load_data(filepath: str) -> pd.DataFrame:
 
 def group_and_aggregate_data(df: pd.DataFrame, group_by_column: str, agg_func) -> pd.DataFrame:
     """
+    Groups and aggregates data, handling both numeric and non-numeric columns appropriately.
+    
     :param df: A pandas DataFrame containing the dataset.
     :param group_by_column: The column to group data by.
-    :param agg_func: The aggregation function to apply to each group.
+    :param agg_func: The aggregation function to apply to numeric columns.
     :return: A pandas DataFrame with aggregated results.
     """
-
-    return df.groupby(group_by_column).agg(agg_func)
+    # Separate numeric and non-numeric columns
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+    non_numeric_cols = df.select_dtypes(exclude=['int64', 'float64']).columns
+    
+    # Remove the group_by_column from both lists if present
+    numeric_cols = [col for col in numeric_cols if col != group_by_column]
+    non_numeric_cols = [col for col in non_numeric_cols if col != group_by_column]
+    
+    # Create aggregation dictionary
+    agg_dict = {}
+    
+    # For numeric columns, use the specified aggregation function
+    for col in numeric_cols:
+        agg_dict[col] = agg_func
+    
+    # For non-numeric columns, use 'first' as the aggregation function
+    # This keeps one representative value for each group
+    for col in non_numeric_cols:
+        agg_dict[col] = 'first'
+    
+    # Perform the groupby operation with the appropriate aggregation for each column
+    grouped_df = df.groupby(group_by_column).agg(agg_dict)
+    
+    return grouped_df
 
 
 def remove_sparse_columns(df: pd.DataFrame, threshold: int) -> pd.DataFrame:

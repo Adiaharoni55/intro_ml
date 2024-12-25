@@ -11,24 +11,25 @@ def setup_sidebar(data):
     # Column selection for grouping
     choose_column = st.sidebar.selectbox("Select the column representing cities:", data.columns)
     
-    # Meta columns selection
+    # Aggregation function selection (common across all visualizations)
+    agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
+
+    # Columns to exclude
     available_columns = [col for col in data.columns if col != choose_column]
-    meta_columns = st.sidebar.multiselect(
-        "Select metadata columns to preserve:",
+    columns_to_exclude = st.sidebar.multiselect(
+        "Select columns to exclude:",
         available_columns,
-        help="These columns will be preserved in the final output without dimensionality reduction"
+        help="These columns will be removed before processing the data"
     )
 
-    # Other parameters
-    num_components = st.sidebar.slider("Number of Components", 2, 10, value=2)
-    agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
+    
     sparse_threshold = st.sidebar.slider("Select Threshold", 100, 2000, value=750)
 
+    
     return {
         'group_column': choose_column,
-        'meta_columns': meta_columns,
-        'num_components': num_components,
         'agg_function': agg_function,
+        'columns_to_exclude': columns_to_exclude,
         'threshold': sparse_threshold
     }
 
@@ -318,6 +319,37 @@ def provide_download_option(data):
         mime="text/csv"
     )
 
+def setup_pca_controls(data, viz_type, group_column):
+    """Setup PCA-specific controls"""
+    if viz_type != "PCA Analysis":
+        return {
+            'meta_columns': [],
+            'num_components': 2
+        }
+    
+    st.write("### PCA Configuration")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Meta columns selection
+        available_columns = [col for col in data.columns if col != group_column]
+        meta_columns = st.multiselect(
+            "Select metadata columns to preserve:",
+            available_columns,
+            help="These columns will be preserved in the final output without dimensionality reduction"
+        )
+            
+    with col2:
+        # Number of components
+        num_components = st.slider("Number of Components", 2, 10, value=2)
+    
+    return {
+        'meta_columns': meta_columns,
+        'num_components': num_components,
+    }
+
+
+# Then, modify the main function to handle column exclusion:
 def main():
     st.title("Israel Elections Data Analysis and Visualization")
     st.subheader("Interactive Analysis of Knesset Election Results")
@@ -331,44 +363,60 @@ def main():
 
     # Display original data
     st.write("### Original Data:")
-    st.dataframe(data.head())
+    st.write(f"Table shape: {data.shape[0]} rows × {data.shape[1]} columns")
+    st.dataframe(data)
 
-    # Sidebar setup
-    sidebar_options = setup_sidebar(data)
-    
-    # Process and display aggregated data (this is what you wanted to add)
-    data_agg = functions.group_and_aggregate_data(data, sidebar_options['group_column'], sidebar_options['agg_function'])
-    sparse_agg_data = functions.remove_sparse_columns(data_agg, sidebar_options['threshold'])
-    
-    # Display aggregated data
-    st.write(f"### Aggregated Data by {sidebar_options['group_column']}")
-    st.dataframe(sparse_agg_data.head())
-
-    # Continue with PCA and other processing
-    processed_data = process_data(data, sidebar_options)
-
-    # Visualization selection and rendering
+    # Visualization selection
     viz_type = st.sidebar.selectbox(
         "Choose visualization type",
         ["PCA Analysis", "Party Distribution", "Voter Turnout by City", 
          "Party Correlation", "City Analysis"]
     )
 
-    # Render selected visualization
-    visualization_functions = {
-        "PCA Analysis": lambda: render_pca_analysis(processed_data['reduced'], 
-                                                  sidebar_options['num_components'], 
-                                                  sidebar_options['meta_columns']),
-        "Party Distribution": lambda: render_party_distribution(data, party_cols),
-        "Voter Turnout by City": lambda: render_voter_turnout(data, party_cols),
-        "Party Correlation": lambda: render_party_correlation(data, party_cols),
-        "City Analysis": lambda: render_city_analysis(data, party_cols)
-    }
+    # Basic sidebar setup (common controls)
+    sidebar_options = setup_sidebar(data)
+    
+    # Process and display aggregated data
+    # First, exclude selected columns (NEW)
+    processed_data = data.drop(columns=sidebar_options['columns_to_exclude'])
+    
+    data_agg = functions.group_and_aggregate_data(
+        processed_data, 
+        sidebar_options['group_column'], 
+        sidebar_options['agg_function']
+    )
+    sparse_agg_data = functions.remove_sparse_columns(data_agg, sidebar_options['threshold'])
+    
+    # Display aggregated data
+    st.write(f"### Aggregated Data by {sidebar_options['group_column']}")
+    st.write(f"Excluded columns: {', '.join(sidebar_options['columns_to_exclude']) if sidebar_options['columns_to_exclude'] else 'None'}")
+    st.write(f"Table shape: {sparse_agg_data.shape[0]} rows × {sparse_agg_data.shape[1]} columns")
+    st.dataframe(sparse_agg_data)
 
-    visualization_functions[viz_type]()
+    # PCA-specific controls (only shown for PCA visualization)
+    pca_options = setup_pca_controls(data, viz_type, sidebar_options['group_column'])
+    
+    # Combine all options
+    options = {**sidebar_options, **pca_options}
+    
+    # Process data based on selected visualization
+    if viz_type == "PCA Analysis":
+        processed_data = process_data(data, options)
+        render_pca_analysis(processed_data['reduced'], 
+                          options['num_components'], 
+                          options['meta_columns'])
+    else:
+        # Other visualizations
+        visualization_functions = {
+            "Party Distribution": lambda: render_party_distribution(data, party_cols),
+            "Voter Turnout by City": lambda: render_voter_turnout(data, party_cols),
+            "Party Correlation": lambda: render_party_correlation(data, party_cols),
+            "City Analysis": lambda: render_city_analysis(data, party_cols)
+        }
+        visualization_functions[viz_type]()
 
-    # Add download button
-    if st.sidebar.button('Download Processed Data'):
+    # Add download button (only for PCA)
+    if viz_type == "PCA Analysis" and st.sidebar.button('Download Processed Data'):
         provide_download_option(processed_data['reduced'])
 
 if __name__ == "__main__":
