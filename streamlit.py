@@ -23,7 +23,7 @@ def setup_sidebar(data):
     )
 
     
-    sparse_threshold = st.sidebar.slider("Select Threshold", 100, 2000, value=750)
+    sparse_threshold = st.sidebar.slider("Select Threshold", 0, 4000, value=750)
 
     
     return {
@@ -57,8 +57,6 @@ def render_pca_analysis(data_reduce, num_components, meta_columns):
         )
         st.plotly_chart(fig)
 
-    st.write("### Component Values")
-    st.bar_chart(data_reduce.select_dtypes(include=['number']))
     st.write("### Reduced Dimensional Data")
     st.dataframe(data_reduce)
 
@@ -113,16 +111,6 @@ def render_top_cities_distribution(data, party_cols, top_cities):
     st.plotly_chart(fig2)
 
 
-def render_correlation_explanation():
-    """Render explanation of correlation heatmap"""
-    st.write("""
-    #### Understanding the Correlation Heatmap:
-    - Red colors indicate positive correlation (parties that tend to receive votes together)
-    - Blue colors indicate negative correlation (parties that tend to compete for votes)
-    - Darker colors indicate stronger correlations
-    """)
-
-
 def render_strongest_correlations(party_cols, party_corr):
     """Render strongest correlations analysis"""
     correlations = []
@@ -156,8 +144,7 @@ def render_party_correlation(data, party_cols):
     )
     st.plotly_chart(fig)
     
-    render_correlation_explanation() #undifind
-    render_strongest_correlations(party_cols, party_corr)#undifind
+    render_strongest_correlations(party_cols, party_corr)
 
 
 def render_city_metrics(city_data, party_cols):
