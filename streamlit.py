@@ -9,7 +9,7 @@ def setup_sidebar(data):
     st.sidebar.title("Options")
     
     # Column selection for grouping
-    choose_column = st.sidebar.selectbox("Select the column representing cities:", data.columns)
+    choose_column = st.sidebar.selectbox("Select the column to aggregate by:", data.columns)
     
     # Aggregation function selection (common across all visualizations)
     agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
@@ -75,24 +75,6 @@ def render_party_distribution(data, party_cols):
     st.plotly_chart(fig)
 
 
-def render_voter_turnout(data, party_cols):
-    """Render voter turnout visualization"""
-    st.write("### Voter Turnout Analysis")
-    city_votes = data.groupby('city_name')[party_cols].sum().sum(axis=1)
-    top_cities = city_votes.nlargest(20)
-    
-    # First visualization: Top 20 cities
-    fig = px.bar(
-        top_cities,
-        title='Top 20 Cities by Total Votes',
-        labels={'value': 'Total Votes', 'index': 'City'}
-    )
-    fig.update_layout(xaxis_tickangle=-45, height=600)
-    st.plotly_chart(fig)
-
-    # Second visualization: Vote distribution
-    render_top_cities_distribution(data, party_cols, top_cities)
-
 
 def render_top_cities_distribution(data, party_cols, top_cities):
     """Render vote distribution for top cities"""
@@ -121,14 +103,6 @@ def render_strongest_correlations(party_cols, party_corr):
                 'Party 2': party_cols[j].replace('party_', ''),
                 'Correlation': party_corr.iloc[i,j]
             })
-    
-    corr_df = pd.DataFrame(correlations)
-    st.write("### Strongest Party Relationships")
-    st.write("Top Positive Correlations:")
-    st.dataframe(corr_df.nlargest(5, 'Correlation'))
-    st.write("Top Negative Correlations:")
-    st.dataframe(corr_df.nsmallest(5, 'Correlation'))
-
 
 def render_party_correlation(data, party_cols):
     """Render party correlation analysis"""
@@ -226,49 +200,39 @@ def render_polling_station_analysis(city_data, party_cols, selected_city):
     st.plotly_chart(fig3)
     
     station_data['Total Votes'] = station_data.sum(axis=1)
-    st.dataframe(station_data.sort_values('Total Votes', ascending=False))
 
-
-def render_city_comparison(data, city_data, party_cols, selected_city):
-    """Render city comparison analysis"""
-    st.write("### Comparison with City Average")
-    city_avg = data.groupby('city_name')[party_cols].sum().mean()
-    selected_city_total = city_data[party_cols].sum()
-    
-    comparison_df = pd.DataFrame({
-        'City Votes': selected_city_total,
-        'Average Across Cities': city_avg
-    }).round(2)
-    
-    comparison_df['Difference (%)'] = ((selected_city_total - city_avg) / city_avg * 100).round(2)
-    comparison_df = comparison_df[selected_city_total > 0]
-    
-    fig4 = px.bar(
-        comparison_df,
-        barmode='group',
-        title=f'Vote Comparison: {selected_city} vs City Average',
-        labels={'value': 'Votes', 'variable': 'Category'}
-    )
-    fig4.update_layout(height=500)
-    st.plotly_chart(fig4)
-    
-    st.write("### Detailed Comparison")
-    st.dataframe(comparison_df.sort_values('Difference (%)', ascending=False))
 
 
 def render_city_analysis(data, party_cols):
     """Render city-specific analysis"""
-    st.write("### City-Specific Analysis")
+    st.write("### City Analysis")
+    city_votes = data.groupby('city_name')[party_cols].sum().sum(axis=1)
+    top_cities = city_votes.nlargest(20)
+        
+
+      # First visualization: Top 20 cities
+    fig = px.bar(
+        top_cities,
+        title='Top 20 Cities by Total Votes',
+        labels={'value': 'Total Votes', 'index': 'City'}
+    )
+    fig.update_layout(xaxis_tickangle=-45, height=600)
+    st.plotly_chart(fig)
     
     # City selection and data preparation
+    st.write("### Analysis per City")
+
     all_cities = sorted(data['city_name'].unique())
     selected_city = st.selectbox("Select a city:", all_cities)
     city_data = data[data['city_name'] == selected_city]
-    
-    render_city_metrics(city_data, party_cols)#undifind
-    render_city_vote_distribution(city_data, party_cols, selected_city)#undifind
-    render_polling_station_analysis(city_data, party_cols, selected_city)#undifind
-    render_city_comparison(data, city_data, party_cols, selected_city)#undifind
+
+    render_city_metrics(city_data, party_cols)
+    render_city_vote_distribution(city_data, party_cols, selected_city)
+    render_polling_station_analysis(city_data, party_cols, selected_city)
+
+      
+
+
 
 
 def process_data(data, options):
@@ -295,16 +259,6 @@ def process_data(data, options):
         'reduced': reduced_data
     }
 
-
-def provide_download_option(data):
-    """Provide download option for processed data"""
-    csv = data.to_csv(index=False)
-    st.sidebar.download_button(
-        label="Download CSV",
-        data=csv,
-        file_name="processed_election_data.csv",
-        mime="text/csv"
-    )
 
 def setup_pca_controls(data, viz_type, group_column):
     """Setup PCA-specific controls"""
@@ -356,7 +310,7 @@ def main():
     # Visualization selection
     viz_type = st.sidebar.selectbox(
         "Choose visualization type",
-        ["PCA Analysis", "Party Distribution", "Voter Turnout by City", 
+        ["PCA Analysis", "Party Distribution", 
          "Party Correlation", "City Analysis"]
     )
 
@@ -396,15 +350,10 @@ def main():
         # Other visualizations
         visualization_functions = {
             "Party Distribution": lambda: render_party_distribution(data, party_cols),
-            "Voter Turnout by City": lambda: render_voter_turnout(data, party_cols),
             "Party Correlation": lambda: render_party_correlation(data, party_cols),
             "City Analysis": lambda: render_city_analysis(data, party_cols)
         }
         visualization_functions[viz_type]()
-
-    # Add download button (only for PCA)
-    if viz_type == "PCA Analysis" and st.sidebar.button('Download Processed Data'):
-        provide_download_option(processed_data['reduced'])
 
 if __name__ == "__main__":
     main()
