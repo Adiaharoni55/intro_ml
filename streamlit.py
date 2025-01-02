@@ -269,8 +269,8 @@ def setup_pca_controls(data, viz_type, group_column):
 
 # Then, modify the main function to handle column exclusion:
 def main():
-    st.title("Israel Elections Data Analysis and Visualization")
-    st.subheader("Interactive Analysis of Knesset Election Results")
+    st.title("Data Analysis and Visualization")
+    st.subheader("Interactive Dataset Analysis")
 
     # File upload and initial data loading
     uploaded_file = st.file_uploader("Upload your file", type=['csv', 'xlsx'])
