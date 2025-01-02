@@ -90,10 +90,11 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         # Sort in descending order
         idx = np.argsort(eigvalues)[::-1]
         eigvalues = eigvalues[idx]
+        
         # Keep only top num_components
         U = U[:, idx]
 
-        # Fix signs to match sklearn's convention**********
+        # Fix signs to match sklearn's convention
         # Make largest element in each column positive
         for i in range(U.shape[1]):
             if np.max(np.abs(U[:, i])) != np.max(U[:, i]):
@@ -116,7 +117,7 @@ def dimensionality_reduction(df: pd.DataFrame, num_components: int, meta_columns
         eigvalues = eigvalues[idx]
         V = V[:, idx]
 
-        # Fix signs to match sklearn's convention***************
+        # Fix signs to match sklearn's convention
         for i in range(V.shape[1]):
             if np.max(np.abs(V[:, i])) != np.max(V[:, i]):
                 V[:, i] *= -1

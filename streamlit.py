@@ -1,7 +1,6 @@
 import streamlit as st
 import plotly.express as px
 import functions
-import pandas as pd
 
 
 def setup_sidebar(data):
@@ -75,24 +74,6 @@ def render_party_distribution(data, party_cols):
     st.plotly_chart(fig)
 
 
-
-def render_top_cities_distribution(data, party_cols, top_cities):
-    """Render vote distribution for top cities"""
-    st.write("### Vote Distribution in Top Cities")
-    top_cities_distribution = data.groupby('city_name')[party_cols].sum()
-    top_cities_distribution = top_cities_distribution.loc[top_cities.index]
-    top_cities_pct = top_cities_distribution.div(top_cities_distribution.sum(axis=1), axis=0) * 100
-    
-    fig2 = px.bar(
-        top_cities_pct,
-        title='Party Vote Distribution in Top 20 Cities (%)',
-        labels={'value': 'Percentage of Votes', 'index': 'City'},
-        barmode='stack'
-    )
-    fig2.update_layout(xaxis_tickangle=-45, height=600)
-    st.plotly_chart(fig2)
-
-
 def render_strongest_correlations(party_cols, party_corr):
     """Render strongest correlations analysis"""
     correlations = []
@@ -103,6 +84,7 @@ def render_strongest_correlations(party_cols, party_corr):
                 'Party 2': party_cols[j].replace('party_', ''),
                 'Correlation': party_corr.iloc[i,j]
             })
+
 
 def render_party_correlation(data, party_cols):
     """Render party correlation analysis"""
@@ -202,7 +184,6 @@ def render_polling_station_analysis(city_data, party_cols, selected_city):
     station_data['Total Votes'] = station_data.sum(axis=1)
 
 
-
 def render_city_analysis(data, party_cols):
     """Render city-specific analysis"""
     st.write("### City Analysis")
@@ -231,10 +212,6 @@ def render_city_analysis(data, party_cols):
     render_polling_station_analysis(city_data, party_cols, selected_city)
 
       
-
-
-
-
 def process_data(data, options):
     """Process data based on sidebar options"""
     # Group and aggregate data
@@ -326,6 +303,7 @@ def main():
         sidebar_options['group_column'], 
         sidebar_options['agg_function']
     )
+
     sparse_agg_data = functions.remove_sparse_columns(data_agg, sidebar_options['threshold'])
     
     # Display aggregated data
