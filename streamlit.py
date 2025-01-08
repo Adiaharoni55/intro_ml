@@ -211,31 +211,7 @@ def render_city_analysis(data, party_cols):
     render_city_vote_distribution(city_data, party_cols, selected_city)
     render_polling_station_analysis(city_data, party_cols, selected_city)
 
-      
-def process_data(data, options):
-    """Process data based on sidebar options"""
-    # Group and aggregate data
-    data_agg = functions.group_and_aggregate_data(data, options['group_column'], options['agg_function'])
-    
-    # Remove sparse columns
-    sparse_agg_data = functions.remove_sparse_columns(data_agg, options['threshold'])
-    
-    # Reset index for meta columns
-    sparse_agg_data = sparse_agg_data.reset_index()
-    
-    # Perform dimensionality reduction
-    reduced_data = functions.dimensionality_reduction(
-        sparse_agg_data, 
-        options['num_components'], 
-        options['meta_columns']
-    )
-    
-    return {
-        'aggregated': data_agg,
-        'sparse': sparse_agg_data,
-        'reduced': reduced_data
-    }
-
+          
 
 def setup_pca_controls(data, viz_type, group_column):
     """Setup PCA-specific controls"""
@@ -313,15 +289,21 @@ def main():
     st.dataframe(sparse_agg_data)
 
     # PCA-specific controls (only shown for PCA visualization)
-    pca_options = setup_pca_controls(data, viz_type, sidebar_options['group_column'])
+    pca_options = setup_pca_controls(sparse_agg_data, viz_type, sidebar_options['group_column'])
     
     # Combine all options
     options = {**sidebar_options, **pca_options}
     
     # Process data based on selected visualization
     if viz_type == "PCA Analysis":
-        processed_data = process_data(data, options)
-        render_pca_analysis(processed_data['reduced'], 
+            # Perform dimensionality reduction
+        reduced_data = functions.dimensionality_reduction(
+            sparse_agg_data, 
+            options['num_components'], 
+            options['meta_columns']
+        )
+    
+        render_pca_analysis(reduced_data, 
                           options['num_components'], 
                           options['meta_columns'])
     else:
