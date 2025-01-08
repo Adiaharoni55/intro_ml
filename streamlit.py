@@ -22,7 +22,18 @@ def setup_sidebar(data):
     if not is_party_wise:
         # City-wise mode options
         choose_column = st.sidebar.selectbox("Select the column to aggregate by:", data.columns)
-        agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
+        agg_function = st.sidebar.selectbox(
+            "Select the aggregation function:",
+            ['sum', 'mean', 'median', 'count', 'std', 'min', 'max'],
+            help="""Choose how to aggregate the data:
+            - sum: Total of all values
+            - mean: Average value
+            - median: Middle value
+            - count: Number of occurrences
+            - std: Standard deviation
+            - min: Minimum value
+            - max: Maximum value"""
+        )
         available_columns = [col for col in data.columns if col != choose_column]
     else:
         # Party-wise mode - get available columns after transposing
