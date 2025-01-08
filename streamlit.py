@@ -3,34 +3,54 @@ import plotly.express as px
 import functions
 
 
+
 def setup_sidebar(data):
     """Setup sidebar options"""
     st.sidebar.title("Options")
     
-    # Column selection for grouping
-    choose_column = st.sidebar.selectbox("Select the column to aggregate by:", data.columns)
+    # Analysis type selection at the top (hidden) for initialization
+    is_party_wise = st.sidebar.checkbox(
+        "Switch to party-wise analysis",
+        help="When enabled, data will be aggregated by cities and transposed to show party correlations. This provides a different perspective on party relationships across cities.",
+        key="party_wise_checkbox"
+    )
     
-    # Aggregation function selection (common across all visualizations)
-    agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
-
-    # Columns to exclude
-    available_columns = [col for col in data.columns if col != choose_column]
+    choose_column = 'city_name'  # Default for party_wise
+    agg_function = 'sum'         # Default for party_wise
+    columns_to_exclude = []      # Will be populated based on mode
+    
+    if not is_party_wise:
+        # City-wise mode options
+        choose_column = st.sidebar.selectbox("Select the column to aggregate by:", data.columns)
+        agg_function = st.sidebar.selectbox("Select the aggregation function:", ['sum', 'mean', 'median'])
+        available_columns = [col for col in data.columns if col != choose_column]
+    else:
+        # Party-wise mode - get available columns after transposing
+        party_cols = [col for col in data.columns if col.startswith('party_')]
+        city_data = data.groupby('city_name')[party_cols].sum()
+        available_columns = city_data.index.tolist()  # Cities become columns after transpose
+    
+    # Show columns to exclude based on current mode's available columns
     columns_to_exclude = st.sidebar.multiselect(
         "Select columns to exclude:",
         available_columns,
         help="These columns will be removed before processing the data"
     )
-
     
     sparse_threshold = st.sidebar.slider("Select Threshold", 0, 4000, value=750)
-
+    
+    # Set analysis type based on checkbox
+    analysis_type = 'party_wise' if is_party_wise else 'city_wise'
     
     return {
+        'analysis_type': analysis_type,
         'group_column': choose_column,
         'agg_function': agg_function,
         'columns_to_exclude': columns_to_exclude,
         'threshold': sparse_threshold
     }
+
+
 
 
 def render_pca_analysis(data_reduce, num_components, meta_columns):
@@ -243,7 +263,30 @@ def setup_pca_controls(data, viz_type, group_column):
     }
 
 
-# Then, modify the main function to handle column exclusion:
+
+def process_data(data, options):
+    """Process data based on analysis type"""
+    party_cols = [col for col in data.columns if col.startswith('party_')]
+    
+    if options['analysis_type'] == 'city_wise':
+        # Original city-wise processing
+        processed_data = data.drop(columns=options['columns_to_exclude'])
+        data_agg = functions.group_and_aggregate_data(
+            processed_data, 
+            options['group_column'], 
+            options['agg_function']
+        )
+        return functions.remove_sparse_columns(data_agg, options['threshold'])
+    else:
+        # Party-wise processing - always aggregate by city_name
+        city_data = data.groupby('city_name')[party_cols].sum()  # Always use sum for party-wise
+        # Remove excluded columns (cities in this case) before transpose
+        if options['columns_to_exclude']:
+            city_data = city_data.drop(index=options['columns_to_exclude'])
+        data_t = city_data.T  # Transpose the data
+        return functions.remove_sparse_columns(data_t, options['threshold'])
+
+
 def main():
     st.title("Data Analysis and Visualization")
     st.subheader("Interactive Dataset Analysis")
@@ -270,39 +313,50 @@ def main():
     # Basic sidebar setup (common controls)
     sidebar_options = setup_sidebar(data)
     
-    # Process and display aggregated data
-    # First, exclude selected columns (NEW)
-    processed_data = data.drop(columns=sidebar_options['columns_to_exclude'])
-    
-    data_agg = functions.group_and_aggregate_data(
-        processed_data, 
-        sidebar_options['group_column'], 
-        sidebar_options['agg_function']
-    )
-
-    sparse_agg_data = functions.remove_sparse_columns(data_agg, sidebar_options['threshold'])
+    # Process data based on analysis type
+    processed_data = process_data(data, sidebar_options)
     
     # Display aggregated data
-    st.write(f"### Aggregated Data by {sidebar_options['group_column']}")
-    st.write(f"Excluded columns: {', '.join(sidebar_options['columns_to_exclude']) if sidebar_options['columns_to_exclude'] else 'None'}")
-    st.write(f"Table shape: {sparse_agg_data.shape[0]} rows × {sparse_agg_data.shape[1]} columns")
-    st.dataframe(sparse_agg_data)
+    st.write(f"### {'City-wise' if sidebar_options['analysis_type'] == 'city_wise' else 'Party-wise'} Aggregated Data")
+    if sidebar_options['columns_to_exclude']:
+        st.write(f"Excluded columns: {', '.join(sidebar_options['columns_to_exclude'])}")
+    st.write(f"Table shape: {processed_data.shape[0]} rows × {processed_data.shape[1]} columns")
+    st.dataframe(processed_data)
 
-    # PCA-specific controls (only shown for PCA visualization)
-    pca_options = setup_pca_controls(sparse_agg_data, viz_type, sidebar_options['group_column'])
-    
-    # Combine all options
-    options = {**sidebar_options, **pca_options}
-    
-    # Process data based on selected visualization
+    # PCA-specific controls
     if viz_type == "PCA Analysis":
-            # Perform dimensionality reduction
+        st.write("### PCA Configuration")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Meta columns selection for both modes
+            available_columns = [col for col in processed_data.columns]
+            meta_columns = st.multiselect(
+                "Select metadata columns to preserve:",
+                available_columns,
+                help="These columns will be preserved in the final output without dimensionality reduction"
+            )
+                
+        with col2:
+            # Number of components
+            num_components = st.slider("Number of Components", 2, 10, value=2)
+        
+        # Combine options
+        pca_options = {
+            'meta_columns': meta_columns,
+            'num_components': num_components
+        }
+        
+        # Combine all options
+        options = {**sidebar_options, **pca_options}
+        
+        # Perform dimensionality reduction
         reduced_data = functions.dimensionality_reduction(
-            sparse_agg_data, 
+            processed_data, 
             options['num_components'], 
             options['meta_columns']
         )
-    
+        
         render_pca_analysis(reduced_data, 
                           options['num_components'], 
                           options['meta_columns'])
@@ -314,6 +368,9 @@ def main():
             "City Analysis": lambda: render_city_analysis(data, party_cols)
         }
         visualization_functions[viz_type]()
+
+
+
 
 if __name__ == "__main__":
     main()
