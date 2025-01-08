@@ -63,32 +63,48 @@ def setup_sidebar(data):
 
 
 
-
 def render_pca_analysis(data_reduce, num_components, meta_columns):
     """Render PCA visualization section"""
     st.write("### PCA Visualization")
-    
+        
     if num_components == 2:
+        # Try using the index for coloring
         fig = px.scatter(
             data_reduce, 
-            x="PC1", y="PC2", 
+            x="PC1", 
+            y="PC2", 
+            color=data_reduce.index,  # Use the index directly
             title="2D PCA Visualization",
             opacity=0.7,
             hover_data=meta_columns
+        )
+        # Customize legend title
+        fig.update_layout(
+            showlegend=True,
+            legend_title="City Name"
         )
         st.plotly_chart(fig)
     elif num_components == 3:
         fig = px.scatter_3d(
             data_reduce, 
-            x="PC1", y="PC2", z="PC3", 
+            x="PC1", 
+            y="PC2", 
+            z="PC3", 
+            color=data_reduce.index,  # Use the index directly
             title="3D PCA Visualization",
             opacity=0.7,
             hover_data=meta_columns
+        )
+        # Customize legend title
+        fig.update_layout(
+            showlegend=True,
+            legend_title="City Name"
         )
         st.plotly_chart(fig)
 
     st.write("### Reduced Dimensional Data")
     st.dataframe(data_reduce)
+
 
 
 def render_party_distribution(data, party_cols):
