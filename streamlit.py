@@ -4,6 +4,29 @@ import functions
 
 
 
+def process_data(data, options):
+    """Process data based on analysis type"""
+    party_cols = [col for col in data.columns if col.startswith('party_')]
+    
+    if options['analysis_type'] == 'city_wise':
+        # Original city-wise processing
+        processed_data = data.drop(columns=options['columns_to_exclude'])
+        data_agg = functions.group_and_aggregate_data(
+            processed_data, 
+            options['group_column'], 
+            options['agg_function']
+        )
+        return functions.remove_sparse_columns(data_agg, options['threshold'])
+    else:
+        # Party-wise processing - always aggregate by city_name
+        city_data = data.groupby('city_name')[party_cols].sum()  # Always use sum for party-wise
+        # Remove excluded columns (cities in this case) before transpose
+        if options['columns_to_exclude']:
+            city_data = city_data.drop(index=options['columns_to_exclude'])
+        data_t = city_data.T  # Transpose the data
+        return functions.remove_sparse_columns(data_t, options['threshold'])
+
+
 def setup_sidebar(data):
     """Setup sidebar options"""
     st.sidebar.title("Options")
@@ -60,51 +83,6 @@ def setup_sidebar(data):
         'columns_to_exclude': columns_to_exclude,
         'threshold': sparse_threshold
     }
-
-
-
-def render_pca_analysis(data_reduce, num_components, meta_columns):
-    """Render PCA visualization section"""
-    st.write("### PCA Visualization")
-        
-    if num_components == 2:
-        # Try using the index for coloring
-        fig = px.scatter(
-            data_reduce, 
-            x="PC1", 
-            y="PC2", 
-            color=data_reduce.index,  # Use the index directly
-            title="2D PCA Visualization",
-            opacity=0.7,
-            hover_data=meta_columns
-        )
-        # Customize legend title
-        fig.update_layout(
-            showlegend=True,
-            legend_title="City Name"
-        )
-        st.plotly_chart(fig)
-    elif num_components == 3:
-        fig = px.scatter_3d(
-            data_reduce, 
-            x="PC1", 
-            y="PC2", 
-            z="PC3", 
-            color=data_reduce.index,  # Use the index directly
-            title="3D PCA Visualization",
-            opacity=0.7,
-            hover_data=meta_columns
-        )
-        # Customize legend title
-        fig.update_layout(
-            showlegend=True,
-            legend_title="City Name"
-        )
-        st.plotly_chart(fig)
-
-    st.write("### Reduced Dimensional Data")
-    st.dataframe(data_reduce)
-
 
 
 def render_party_distribution(data, party_cols):
@@ -258,62 +236,67 @@ def render_city_analysis(data, party_cols):
     render_city_vote_distribution(city_data, party_cols, selected_city)
     render_polling_station_analysis(city_data, party_cols, selected_city)
 
-          
 
-def setup_pca_controls(data, viz_type, group_column):
-    """Setup PCA-specific controls"""
-    if viz_type != "PCA Analysis":
-        return {
-            'meta_columns': [],
-            'num_components': 2
+def render_pca_analysis(data_reduce, num_components, meta_columns, with_color):
+    """Render PCA visualization section"""
+    st.write("### PCA Visualization")
+    
+    if num_components == 2:
+        # Create base scatter plot arguments
+        scatter_args = {
+            'data_frame': data_reduce,
+            'x': "PC1",
+            'y': "PC2",
+            'title': "2D PCA Visualization",
+            'opacity': 0.7,
+            'hover_data': meta_columns
         }
-    
-    st.write("### PCA Configuration")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Meta columns selection
-        available_columns = [col for col in data.columns if col != group_column]
-        meta_columns = st.multiselect(
-            "Select metadata columns to preserve:",
-            available_columns,
-            help="These columns will be preserved in the final output without dimensionality reduction"
-        )
+        
+        # Add color parameter only if with_color is True
+        if with_color:
+            scatter_args['color'] = data_reduce.index
             
-    with col2:
-        # Number of components
-        num_components = st.slider("Number of Components", 2, 10, value=2)
+        fig = px.scatter(**scatter_args)
+        
+        # Customize legend title only if colors are shown
+        if with_color:
+            fig.update_layout(
+                showlegend=True,
+                legend_title="City Name"
+            )
+        st.plotly_chart(fig)
+        
+    elif num_components == 3:
+        # Create base scatter plot arguments
+        scatter_args = {
+            'data_frame': data_reduce,
+            'x': "PC1",
+            'y': "PC2",
+            'z': "PC3",
+            'title': "3D PCA Visualization",
+            'opacity': 0.7,
+            'hover_data': meta_columns
+        }
+        
+        # Add color parameter only if with_color is True
+        if with_color:
+            scatter_args['color'] = data_reduce.index
+            
+        fig = px.scatter_3d(**scatter_args)
+        
+        # Customize legend title only if colors are shown
+        if with_color:
+            fig.update_layout(
+                showlegend=True,
+                legend_title="City Name"
+            )
+        st.plotly_chart(fig)
+
+    st.write("### Reduced Dimensional Data")
+    st.dataframe(data_reduce)
+
+
     
-    return {
-        'meta_columns': meta_columns,
-        'num_components': num_components,
-    }
-
-
-
-def process_data(data, options):
-    """Process data based on analysis type"""
-    party_cols = [col for col in data.columns if col.startswith('party_')]
-    
-    if options['analysis_type'] == 'city_wise':
-        # Original city-wise processing
-        processed_data = data.drop(columns=options['columns_to_exclude'])
-        data_agg = functions.group_and_aggregate_data(
-            processed_data, 
-            options['group_column'], 
-            options['agg_function']
-        )
-        return functions.remove_sparse_columns(data_agg, options['threshold'])
-    else:
-        # Party-wise processing - always aggregate by city_name
-        city_data = data.groupby('city_name')[party_cols].sum()  # Always use sum for party-wise
-        # Remove excluded columns (cities in this case) before transpose
-        if options['columns_to_exclude']:
-            city_data = city_data.drop(index=options['columns_to_exclude'])
-        data_t = city_data.T  # Transpose the data
-        return functions.remove_sparse_columns(data_t, options['threshold'])
-
-
 def main():
     st.title("Data Analysis and Visualization")
     st.subheader("Interactive Dataset Analysis")
@@ -353,7 +336,7 @@ def main():
     # PCA-specific controls
     if viz_type == "PCA Analysis":
         st.write("### PCA Configuration")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             # Meta columns selection for both modes
@@ -368,10 +351,14 @@ def main():
             # Number of components
             num_components = st.slider("Number of Components", 2, 10, value=2)
         
+        with col3:
+            with_color = st.checkbox("Color the data by index column")
+        
         # Combine options
         pca_options = {
             'meta_columns': meta_columns,
-            'num_components': num_components
+            'num_components': num_components,
+            'with_color': with_color
         }
         
         # Combine all options
@@ -386,7 +373,9 @@ def main():
         
         render_pca_analysis(reduced_data, 
                           options['num_components'], 
-                          options['meta_columns'])
+                          options['meta_columns'],
+                          options['with_color']
+                          )
     else:
         # Other visualizations
         visualization_functions = {
